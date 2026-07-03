@@ -43,7 +43,7 @@ const MAX_FILE_SIZE = 4 * 1024 * 1024;
 const MAX_ANALYSIS_TEXT_LENGTH = 12000;
 const SESSION_COOKIE = 'paper_insight_session';
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7;
-const PASSWORD_ITERATIONS = 210000;
+const PASSWORD_ITERATIONS = 100000;
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
