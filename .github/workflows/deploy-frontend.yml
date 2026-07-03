@@ -33,7 +33,7 @@ jobs:
       - name: Build frontend
         run: npm run build:frontend
         env:
-          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+          VITE_API_BASE_URL: https://paper-insight-worker.edu-qingxue.workers.dev
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
