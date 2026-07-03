@@ -348,7 +348,7 @@ async function handleAnalyzeMultimodal(request: Request, env: Env, corsHeaders: 
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'gpt-4o',
+      model: 'gpt-5.5',
       temperature: 0.2,
       response_format: { type: 'json_object' },
       messages: [
