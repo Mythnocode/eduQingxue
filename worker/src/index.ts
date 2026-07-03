@@ -3,6 +3,7 @@ type Env = {
   BAIDU_OCR_API_KEY: string;
   BAIDU_OCR_SECRET_KEY: string;
   DEEPSEEK_API_KEY: string;
+  GEEKSPACE_API_KEY?: string;
   DEEPSEEK_MODEL?: string;
   ALLOWED_ORIGIN?: string;
   BAIDU_OCR_MODE?: 'auto' | 'accurate_basic' | 'formula';
@@ -116,6 +117,15 @@ export default {
         return await handleAnalyzeImage(request, env, corsHeaders);
       } catch (error) {
         return authAwareError(error, '分析失败，请稍后重试。', corsHeaders);
+      }
+    }
+
+    if (url.pathname === '/api/analyze-multimodal' && request.method === 'POST') {
+      try {
+        await requireUser(request, env);
+        return await handleAnalyzeMultimodal(request, env, corsHeaders);
+      } catch (error) {
+        return authAwareError(error, '多模态分析失败，请稍后重试。', corsHeaders);
       }
     }
 
@@ -307,6 +317,72 @@ async function handleAnalyzeImage(request: Request, env: Env, corsHeaders: Heade
   const result = await analyzeWithDeepSeek(ocrText, env);
 
   result.originalTextPreview = ocrText.slice(0, 1200);
+
+  return json({ result }, 200, corsHeaders);
+}
+
+async function handleAnalyzeMultimodal(request: Request, env: Env, corsHeaders: HeadersInit): Promise<Response> {
+  assertGeekspaceConfigured(env);
+
+  const file = await readImageFile(request);
+  const imageBase64 = await fileToBase64(file);
+  const mimeType = file.type || 'image/jpeg';
+  const dataUrl = `data:${mimeType};base64,${imageBase64}`;
+
+  const prompt = [
+    '你是一个面向中小学教师的试卷分析助手。',
+    '请直接根据试卷图片分析试卷，输出严格 JSON，不要输出 Markdown。',
+    '只输出教学分析结果，不要评价图片质量、识别准确性或文件解析过程。',
+    '如果题目信息不完整，请基于可见内容做概括性分析，重点放在知识点覆盖、题型结构、难度分布和讲评建议。',
+    'JSON 字段：summary, subject, grade, questionCount, knowledgeCoverage, difficultyDistribution, questionTypes, weakPoints, lectureSuggestions。',
+    'knowledgeCoverage 是数组，元素包含 name, count, importance。importance 只能是 low, medium, high。',
+    'difficultyDistribution 包含 easy, medium, hard，数值为题目数量估计。',
+    'questionTypes 是数组，元素包含 type, count。',
+    'weakPoints 和 lectureSuggestions 都是中文字符串数组，每项不超过 40 字。',
+  ].join('\n');
+
+  const response = await fetch('https://geekspace.cloud/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${env.GEEKSPACE_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'gpt-4o',
+      temperature: 0.2,
+      response_format: { type: 'json_object' },
+      messages: [
+        {
+          role: 'system',
+          content: '你只输出符合要求的 JSON 对象，字段缺失时使用合理默认值。',
+        },
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: prompt },
+            { type: 'image_url', image_url: { url: dataUrl } },
+          ],
+        },
+      ],
+    }),
+  });
+
+  const payload = (await response.json()) as {
+    choices?: Array<{ message?: { content?: string } }>;
+    error?: { message?: string };
+  };
+
+  if (!response.ok) {
+    throw new Error(`多模态分析失败：${payload.error?.message || response.statusText}`);
+  }
+
+  const content = payload.choices?.[0]?.message?.content;
+  if (!content) {
+    throw new Error('多模态分析未返回有效结果。');
+  }
+
+  const result = normalizeAnalysis(parseJsonObject(content));
+  result.originalTextPreview = '';
 
   return json({ result }, 200, corsHeaders);
 }
@@ -596,6 +672,10 @@ function assertBaiduConfigured(env: Env): void {
 
 function assertDeepSeekConfigured(env: Env): void {
   assertKeys([['DEEPSEEK_API_KEY', env.DEEPSEEK_API_KEY]]);
+}
+
+function assertGeekspaceConfigured(env: Env): void {
+  assertKeys([['GEEKSPACE_API_KEY', env.GEEKSPACE_API_KEY]]);
 }
 
 function assertDatabaseConfigured(env: Env): void {

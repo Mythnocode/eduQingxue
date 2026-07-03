@@ -4,7 +4,7 @@ compatibility_date = "2026-07-02"
 
 [vars]
 DEEPSEEK_MODEL = "deepseek-chat"
-ALLOWED_ORIGIN = "https://Mythnocode.github.io"
+ALLOWED_ORIGIN = "https://mythnocode.github.io"
 BAIDU_OCR_MODE = "auto"
 
 [[d1_databases]]

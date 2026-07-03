@@ -136,6 +136,7 @@ function App() {
   const [result, setResult] = React.useState<AnalysisResult | null>(null);
   const [error, setError] = React.useState('');
   const [loadingStage, setLoadingStage] = React.useState<LoadingStage>('idle');
+  const [analysisMode, setAnalysisMode] = React.useState<'default' | 'multimodal'>('default');
 
   React.useEffect(() => {
     void loadCurrentUser();
@@ -274,6 +275,36 @@ function App() {
     }
   };
 
+  const analyzeMultimodal = async () => {
+    if (!paperFile) {
+      setError('请先上传试卷图片。');
+      return;
+    }
+    if (!paperFile.type.startsWith('image/')) {
+      setError('多模态模式仅支持图片文件（JPG、PNG、WEBP）。');
+      return;
+    }
+    setLoadingStage('analysis');
+    setError('');
+    setResult(null);
+    try {
+      const formData = new FormData();
+      formData.append('file', paperFile);
+      const response = await fetch(`${API_BASE_URL}/api/analyze-multimodal`, {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.message || '多模态分析失败，请稍后重试。');
+      setResult((payload as AnalysisResponse).result);
+    } catch (currentError) {
+      setError(currentError instanceof Error ? currentError.message : '多模态分析失败，请稍后重试。');
+    } finally {
+      setLoadingStage('idle');
+    }
+  };
+
   if (authLoading) {
     return (
       <div className="auth-loading">
@@ -311,10 +342,13 @@ function App() {
               result={result}
               isExtractLoading={loadingStage === 'extract'}
               isAnalysisLoading={loadingStage === 'analysis'}
+              analysisMode={analysisMode}
               onFileChange={handlePaperFile}
               onExtract={extractPaperText}
               onAnalyze={analyzeText}
+              onAnalyzeMultimodal={analyzeMultimodal}
               onTextChange={setPaperText}
+              onModeChange={setAnalysisMode}
             />
           )}
           {activeModule === 'grading' && <SmartGrading />}
@@ -599,10 +633,13 @@ function ExamAnalysis(props: {
   result: AnalysisResult | null;
   isExtractLoading: boolean;
   isAnalysisLoading: boolean;
+  analysisMode: 'default' | 'multimodal';
   onFileChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onExtract: () => void;
   onAnalyze: () => void;
+  onAnalyzeMultimodal: () => void;
   onTextChange: (text: string) => void;
+  onModeChange: (mode: 'default' | 'multimodal') => void;
 }) {
   const {
     file,
@@ -612,10 +649,13 @@ function ExamAnalysis(props: {
     result,
     isExtractLoading,
     isAnalysisLoading,
+    analysisMode,
     onFileChange,
     onExtract,
     onAnalyze,
+    onAnalyzeMultimodal,
     onTextChange,
+    onModeChange,
   } = props;
   const [customTag, setCustomTag] = React.useState('');
   const [manualTags, setManualTags] = React.useState<string[]>([]);
@@ -632,42 +672,71 @@ function ExamAnalysis(props: {
     <div className="page-stack">
       <PageHeader title="试卷智能分析" description="上传试卷，AI 一键生成知识点覆盖、难度分布及讲评建议" />
 
+      <div className="mode-selector">
+        <button className={analysisMode === 'default' ? 'active' : ''} type="button" onClick={() => onModeChange('default')}>
+          <ScanLine size={16} />
+          默认模式
+        </button>
+        <button className={analysisMode === 'multimodal' ? 'active' : ''} type="button" onClick={() => onModeChange('multimodal')}>
+          <Sparkles size={16} />
+          多模态模型
+        </button>
+      </div>
+
       <section className="exam-layout">
         <div className="upload-card">
           <div className="upload-visual">
             {isExtractLoading ? <Sparkles className="spin-slow" size={48} /> : <FileText size={48} />}
           </div>
           <h3>{isExtractLoading ? 'AI 正在读取试卷...' : '点击或拖拽上传试卷'}</h3>
-          <p>支持 PDF、DOCX、JPG、PNG。文本型 PDF 与 Word 会在浏览器本地读取，图片调用 OCR。</p>
+          <p>
+            {analysisMode === 'multimodal'
+              ? '多模态模式仅支持图片（JPG、PNG、WEBP），AI 直接理解图片内容。'
+              : '支持 PDF、DOCX、JPG、PNG。文本型 PDF 与 Word 会在浏览器本地读取，图片调用 OCR。'}
+          </p>
           <label className="primary-label">
             <UploadCloud size={18} />
             <span>{file ? file.name : '选择文件并上传'}</span>
-            <input type="file" accept="image/png,image/jpeg,image/webp,application/pdf,.docx" onChange={onFileChange} />
+            <input
+              type="file"
+              accept={analysisMode === 'multimodal' ? 'image/png,image/jpeg,image/webp' : 'image/png,image/jpeg,image/webp,application/pdf,.docx'}
+              onChange={onFileChange}
+            />
           </label>
           {previewUrl && <img className="preview" src={previewUrl} alt="试卷预览" />}
-          <button className="secondary-action full" type="button" onClick={onExtract} disabled={isExtractLoading || !file}>
-            {isExtractLoading ? <Loader2 className="spin" size={18} /> : <TextSearch size={18} />}
-            {paperText ? '重新提取文本' : '提取试卷文本'}
-          </button>
+          {analysisMode === 'default' && (
+            <button className="secondary-action full" type="button" onClick={onExtract} disabled={isExtractLoading || !file}>
+              {isExtractLoading ? <Loader2 className="spin" size={18} /> : <TextSearch size={18} />}
+              {paperText ? '重新提取文本' : '提取试卷文本'}
+            </button>
+          )}
+          {analysisMode === 'multimodal' && (
+            <button className="primary-action full" type="button" onClick={onAnalyzeMultimodal} disabled={isAnalysisLoading || !file}>
+              {isAnalysisLoading ? <Loader2 className="spin" size={18} /> : <BrainCircuit size={18} />}
+              {isAnalysisLoading ? '分析中' : '直接生成分析'}
+            </button>
+          )}
         </div>
 
-        <Panel
-          title="试卷文本"
-          note={textSource ? `来源：${textSource}。可继续手动修正文档内容。` : '也可以直接粘贴试卷文本后生成分析。'}
-          action={
-            <button className="primary-action" type="button" onClick={onAnalyze} disabled={isAnalysisLoading || !paperText.trim()}>
-              {isAnalysisLoading ? <Loader2 className="spin" size={16} /> : <BrainCircuit size={16} />}
-              {isAnalysisLoading ? '分析中' : '生成分析'}
-            </button>
-          }
-        >
-          <textarea
-            className="ocr-editor"
-            placeholder="提取出的试卷文本会显示在这里。也可以直接粘贴试卷文本，再点击生成分析。"
-            value={paperText}
-            onChange={(event) => onTextChange(event.target.value)}
-          />
-        </Panel>
+        {analysisMode === 'default' && (
+          <Panel
+            title="试卷文本"
+            note={textSource ? `来源：${textSource}。可继续手动修正文档内容。` : '也可以直接粘贴试卷文本后生成分析。'}
+            action={
+              <button className="primary-action" type="button" onClick={onAnalyze} disabled={isAnalysisLoading || !paperText.trim()}>
+                {isAnalysisLoading ? <Loader2 className="spin" size={16} /> : <BrainCircuit size={16} />}
+                {isAnalysisLoading ? '分析中' : '生成分析'}
+              </button>
+            }
+          >
+            <textarea
+              className="ocr-editor"
+              placeholder="提取出的试卷文本会显示在这里。也可以直接粘贴试卷文本，再点击生成分析。"
+              value={paperText}
+              onChange={(event) => onTextChange(event.target.value)}
+            />
+          </Panel>
+        )}
       </section>
 
       {!result ? (
