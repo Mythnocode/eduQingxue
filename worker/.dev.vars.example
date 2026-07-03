@@ -1,0 +1,6 @@
+BAIDU_OCR_API_KEY=your_baidu_ocr_api_key
+BAIDU_OCR_SECRET_KEY=your_baidu_ocr_secret_key
+DEEPSEEK_API_KEY=your_deepseek_api_key
+DEEPSEEK_MODEL=deepseek-chat
+ALLOWED_ORIGIN=http://localhost:5173
+BAIDU_OCR_MODE=auto

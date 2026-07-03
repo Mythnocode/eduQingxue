@@ -1,0 +1,20 @@
+{
+  "name": "paper-insight-online",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Online exam paper analysis MVP with GitHub Pages frontend and Cloudflare Workers backend.",
+  "scripts": {
+    "dev:frontend": "npm --prefix frontend run dev",
+    "build:frontend": "npm --prefix frontend run build",
+    "preview:frontend": "npm --prefix frontend run preview",
+    "dev:worker": "npm --prefix worker run dev",
+    "deploy:worker": "npm --prefix worker run deploy",
+    "db:migrate:local": "npm --prefix worker exec wrangler d1 migrations apply paper-insight-db --local",
+    "db:migrate:remote": "npm --prefix worker exec wrangler d1 migrations apply paper-insight-db --remote",
+    "check": "npm --prefix frontend run build && npm --prefix worker run check"
+  },
+  "workspaces": [
+    "frontend",
+    "worker"
+  ]
+}

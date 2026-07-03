@@ -1,0 +1,14 @@
+name = "paper-insight-worker"
+main = "src/index.ts"
+compatibility_date = "2026-07-02"
+
+[vars]
+DEEPSEEK_MODEL = "deepseek-chat"
+ALLOWED_ORIGIN = "*"
+BAIDU_OCR_MODE = "auto"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "paper-insight-db"
+database_id = "1a88b2e3-23d3-492d-868d-0f7b5be93d02"
+preview_database_id = "1a88b2e3-23d3-492d-868d-0f7b5be93d02"
